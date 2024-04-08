@@ -16,7 +16,7 @@
 import torch.nn as nn
 from .backbone import WaffleIron
 from .embedding import Embedding
-
+import torch
 
 class Segmenter(nn.Module):
     def __init__(
@@ -42,6 +42,20 @@ class Segmenter(nn.Module):
         self.waffleiron.compress()
 
     def forward(self, feats, cell_ind, occupied_cell, neighbors):
-        tokens = self.embed(feats, neighbors)
+        tokens, local_features = self.embed(feats, neighbors)
         tokens = self.waffleiron(tokens, cell_ind, occupied_cell)
-        return self.classif(tokens)
+
+        # B, C, N = tokens.shape
+
+        #gather = []
+
+        #for ind_nn in range(
+        #    1, neighbors.shape[1]
+        #):  # Remove first neighbors which is the center point
+        #    temp = neighbors[:, ind_nn : ind_nn + 1, :].expand(-1, tokens.shape[1], -1)
+        #    gather.append(torch.gather(tokens, 2, temp).unsqueeze(-1))
+        #neighbor_gather = torch.cat(gather, -1).mean(-1).reshape(B, C, N)
+
+        #return self.classif(torch.cat((tokens, neighbor_gather), dim=1))
+
+        return self.classif(tokens + local_features)

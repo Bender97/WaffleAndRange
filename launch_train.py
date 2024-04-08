@@ -27,6 +27,7 @@ from utils.trainer import TrainingManager
 from waffleiron.segmenter import Segmenter
 from datasets import LIST_DATASETS, Collate
 
+import time
 
 def load_model_config(file):
     with open(file) as f:
@@ -176,6 +177,20 @@ def distributed_training(gpu, ngpus_per_node, args, config):
         drop_path_prob=config["waffleiron"]["drop"],
     )
 
+    cuda0 = torch.device('cuda:0')
+
+    # ckpt = torch.load("/media/fusaro/PortableSSD/waffle1024_12_head_aug/models/ckpt_25.pth", map_location="cuda:0")
+    # try:
+    #     model.load_state_dict(ckpt["net"])
+    # except:
+    #     # If net was trained using DataParallel or DistributedDataParallel
+    #     state_dict = {}
+    #     for key in ckpt["net"].keys():
+    #         state_dict[key[len("module."):]] = ckpt["net"][key]
+    #     model.load_state_dict(state_dict, strict=False)
+    model.train()
+
+
     # ---
     args.batch_size = config["dataloader"]["batch_size"]
     args.workers = config["dataloader"]["num_workers"]
@@ -202,7 +217,7 @@ def distributed_training(gpu, ngpus_per_node, args, config):
         # DataParallel will divide and allocate batch_size to all available GPUs
         model = torch.nn.DataParallel(model).cuda()
     if args.gpu == 0 or args.gpu is None:
-        print(f"Model:\n{model}")
+        #print(f"Model:\n{model}")
         nb_param = sum([p.numel() for p in model.parameters()]) / 1e6
         print(f"{nb_param} x 10^6 trainable parameters ")
 
@@ -321,7 +336,7 @@ def get_default_parser():
         default="/datasets_local/nuscenes/",
     )
     parser.add_argument(
-        "--log_path", type=str, required=True, help="Path to log folder"
+        "--log_path", type=str, required=False, help="Path to log folder"
     )
     parser.add_argument(
         "-r", "--restart", action="store_true", default=False, help="Restart training"
@@ -347,7 +362,7 @@ def get_default_parser():
         help="Enable autocast for mix precision training",
     )
     parser.add_argument(
-        "--config", type=str, required=True, help="Path to model config"
+        "--config", type=str, required=False, help="Path to model config"
     )
     parser.add_argument(
         "--trainval",
@@ -368,5 +383,21 @@ def get_default_parser():
 if __name__ == "__main__":
     parser = get_default_parser()
     args = parser.parse_args()
+
+
+    # args.dataset="nuscenes" #"semantic_kitti"
+    # args.path_dataset = f"/media/fusaro/PortableSSD/Datasets/nuScenes/" #f"/media/data/Datasets/Semantic_Kitty/"
+    # args.config = "./configs/WaffleIron-48-384__nuscenes.yaml" #"./configs/WaffleIron-48-256__kitti.yaml"
+    # args.fp16=True
+    # args.trainval=False
+
+
+    args.dataset="semantic_kitti"
+    args.path_dataset = f"/media/fusy/Windows-SSD/Users/orasu/Desktop/SemanticKittiDataset/data_odometry_velodyne/dataset/"
+    args.config = "./configs/WaffleIron-48-256__kitti.yaml"
+    args.fp16=True
+    args.trainval=True
+
+
     config = load_model_config(args.config)
     main(args, config)

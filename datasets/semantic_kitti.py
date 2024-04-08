@@ -237,7 +237,7 @@ class SemanticKITTI(PCDataset):
                 glob(
                     os.path.join(
                         self.rootdir,
-                        "dataset",
+                        #"dataset",
                         "sequences",
                         str(i_folder).zfill(2),
                         "velodyne",
@@ -245,6 +245,7 @@ class SemanticKITTI(PCDataset):
                     )
                 )
             )
+        
         self.im_idx = np.sort(self.im_idx)
 
         # Training with instance cutmix

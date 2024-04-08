@@ -38,15 +38,24 @@ git clone https://github.com/Bender97/WaffleAndRange
 pip install -e ./
 ```
 
-<!--Download the trained models:
+Then, compile the cuda related stuff.
+```
+cd cudastuff
+mkdir build && cd build
+cmake ..
+make -j5
+```
+
+
+Download the trained models:
 ```
 wget https://github.com/valeoai/WaffleIron/files/10294733/info_datasets.tar.gz
 tar -xvzf info_datasets.tar.gz
-wget https://github.com/valeoai/WaffleIron/releases/download/v0.2.0/waffleiron_nuscenes.tar.gz
-tar -xvzf waffleiron_nuscenes.tar.gz
-wget https://github.com/valeoai/WaffleIron/releases/download/v0.2.0/waffleiron_kitti.tar.gz
-tar -xvzf waffleiron_kitti.tar.gz
-```-->
+```
+[**SemanticKITTI model**](https://drive.google.com/file/d/1bSiQIvdA9P08NJS05qNXpcsAd6l_sIDw/view?usp=sharing)
+
+<!--wget https://github.com/valeoai/WaffleIron/releases/download/v0.2.0/waffleiron_nuscenes.tar.gz
+tar -xvzf waffleiron_nuscenes.tar.gz-->
 
 If you want to uninstall this package, type `pip uninstall waffleiron`.
 
@@ -82,7 +91,6 @@ python launch_train.py \
 This should give you a final mIoU of 68.0%.
 
 **Remark:** *On SemanticKITTI, the code above will extract object instances on the train set (despite this being not necessary for validation) because this augmentation is activated for training on this dataset (and this code re-use the training script). This can be bypassed by editing the `yaml` config file and changing the entry `instance_cutmix` to `False`. The instances are saved automatically in `/tmp/semantic_kitti_instances/`.*
-
 
 ### Option 2: Using the official APIs
 
@@ -215,21 +223,16 @@ tar -xvzf pretrained_kitti.tar.gz
 ```
 
 ## Acknowledgements
-We thank the authors of 
-```
-@inproceedings{berman18lovasz,
-author = {Berman, Maxim and Triki, Amal Rannen and Blaschko, Matthew B.},
-title = {The Lovász-Softmax Loss: A Tractable Surrogate for the Optimization of the Intersection-Over-Union Measure 
-in Neural Networks},
-booktitle = {CVPR},
-year = {2018}
-}
-```
-for making their [implementation](https://github.com/bermanmaxim/LovaszSoftmax) of the Lovász loss publicly available.
+
+We thank the author of
+https://github.com/ingowald/cudaKDTree
+
+for making their [implementation](https://github.com/ingowald/cudaKDTree) of the KDTree publicly available and very easy to use and understand.
+
 
 
 ## License
-WaffleIron is released under the [Apache 2.0 license](./LICENSE). 
+WaffleAndRange is released under the [Apache 2.0 license](./LICENSE). 
 
 The implementation of the Lovász loss in `utils/lovasz.py` is released under 
 [MIT Licence](https://github.com/bermanmaxim/LovaszSoftmax/blob/master/LICENSE).

@@ -60,6 +60,7 @@ class NuScenesSemSeg(PCDataset):
         self.list_frames = np.load(
             os.path.join(current_folder, "list_files_nuscenes.npz")
         )[self.phase]
+
         if self.phase == "train":
             assert len(self) == 28130
         elif self.phase == "val":

@@ -21,6 +21,11 @@ from torch.cuda.amp import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from utils.metrics import overall_accuracy, fast_hist, per_class_iu, per_class_accuracy
 
+import cupy as cp
+
+import ctypes
+from ctypes import cdll
+from numpy.ctypeslib import ndpointer
 
 class TrainingManager:
     def __init__(
@@ -66,6 +71,38 @@ class TrainingManager:
         self.best_miou = 0
         self.current_epoch = 0
         self.path_to_ckpt = path
+
+        ## KDtree
+
+        lib = cdll.LoadLibrary('cudastuff/build/libmylib_train.so')
+        self.training_kdtree_obj = lib.MyFastKDTree_new()
+        self.runTree_training = lib.MyFastKDTree_run
+
+        self.runTree_training.argtypes = [ctypes.c_void_p,
+                ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),  ## indatav
+                ctypes.c_size_t,                                  ## tree_size  
+                ctypes.POINTER(ctypes.c_int)]                     ## d_results_k
+
+        self.runTree_training.restype   = ctypes.c_void_p
+
+        
+
+        lib = cdll.LoadLibrary('cudastuff/build/libmylib_user.so')
+        self.valid_kdtree_obj = lib.MyFastKDTree_new()
+
+        self.runTree_valid = lib.MyFastKDTree_run
+
+        self.runTree_valid.argtypes = [ctypes.c_void_p,
+                ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),  ## indatav
+                ctypes.c_size_t,                                  ## tree_size  
+                ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),  ## queries_k
+                ctypes.c_size_t,                                  ## numQueries_k
+                ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),  ## queries_1
+                ctypes.c_size_t,                                  ## numQueries_1
+                ctypes.POINTER(ctypes.c_int),                     ## d_results_k
+                ctypes.POINTER(ctypes.c_int),]                    ## d_results_1
+
+        self.runTree_valid.restype   = ctypes.c_void_p
 
         # Monitoring
         if tensorboard and (self.rank == 0 or self.rank is None):
@@ -148,15 +185,73 @@ class TrainingManager:
             bar_format = "{desc:<5.5}{percentage:3.0f}%|{bar:50}{r_bar}"
             loader = tqdm(loader, bar_format=bar_format)
         for it, batch in enumerate(loader):
+
+            
+            Nmax = np.max([f.shape[0] for f in batch["pc"]])
+            neigs = []
+            upsample = []
+
+            if training:
+                for pc, pc_orig in zip(batch["pc"], batch["pc_orig"]):
+                    N = pc.shape[0]
+                    data = pc[:, :3].reshape(-1).astype(np.float32)
+                    results_k = cp.zeros((N, 17), dtype=cp.int32)
+                    results_k_ctypes = ctypes.cast(results_k.data.ptr, ctypes.POINTER(ctypes.c_int32))
+
+                    self.runTree_training(self.training_kdtree_obj, data, data.size, results_k_ctypes)
+
+                    results_k = torch.from_dlpack(results_k.toDlpack()).long()
+                    new_arr = torch.argsort(results_k[:, 0])
+                    neighb = new_arr[results_k].T[None]
+
+                    neighb = torch.cat(
+                        (
+                            neighb,
+                            (Nmax - 1) * torch.ones((1, neighb.shape[1], Nmax - N)).cuda(),
+                        ),
+                        axis=2,
+                    )
+
+
+                    neigs.append(neighb)
+                    upsample.append(torch.arange(pc.shape[0]).cuda(self.rank, non_blocking=True))
+            else:
+                for pc, pc_orig in zip(batch["pc"], batch["pc_orig"]):
+                    N = pc.shape[0]
+
+                    data = pc[:, :3].reshape(-1).astype(np.float32)
+                    results_k = cp.zeros((N, 17), dtype=cp.int32)
+                    results_1 = cp.zeros(pc_orig.shape[0], dtype=cp.int32)
+
+                    results_k_ctypes = ctypes.cast(results_k.data.ptr, ctypes.POINTER(ctypes.c_int32))
+                    results_1_ctypes = ctypes.cast(results_1.data.ptr, ctypes.POINTER(ctypes.c_int32))
+
+                    full = pc_orig[:, :3].reshape(-1).astype(np.float32)
+
+                    self.runTree_valid(self.valid_kdtree_obj, data, data.size, data, data.size, full, full.shape[0], results_k_ctypes, results_1_ctypes)
+                    results_k = torch.from_dlpack(results_k.toDlpack()).long()
+                    results_1 = torch.from_dlpack(results_1.toDlpack()).long()
+                    
+                    new_arr = torch.argsort(results_k[:, 0])
+                    neighb = new_arr[results_k].T[None]
+
+                    neighb = torch.cat(
+                        (
+                            neighb,
+                            (Nmax - 1) * torch.ones((1, neighb.shape[1], Nmax - N)).cuda(),
+                        ),
+                        axis=2,
+                    )
+                    neigs.append(neighb)
+                    upsample.append(new_arr[results_1.T])
+                        
+            neighbors_emb = torch.vstack(neigs).long()
+
             # Network inputs
             feat = batch["feat"].cuda(self.rank, non_blocking=True)
             labels = batch["labels_orig"].cuda(self.rank, non_blocking=True)
-            batch["upsample"] = [
-                up.cuda(self.rank, non_blocking=True) for up in batch["upsample"]
-            ]
             cell_ind = batch["cell_ind"].cuda(self.rank, non_blocking=True)
             occupied_cell = batch["occupied_cells"].cuda(self.rank, non_blocking=True)
-            neighbors_emb = batch["neighbors_emb"].cuda(self.rank, non_blocking=True)
             net_inputs = (feat, cell_ind, occupied_cell, neighbors_emb)
 
             # Get prediction and loss
@@ -169,7 +264,7 @@ class TrainingManager:
                         out = net(*net_inputs)
                 # Upsample to original resolution
                 out_upsample = []
-                for id_b, closest_point in enumerate(batch["upsample"]):
+                for id_b, closest_point in enumerate(upsample):
                     temp = out[id_b, :, closest_point]
                     out_upsample.append(temp.T)
                 out = torch.cat(out_upsample, dim=0)
@@ -239,17 +334,17 @@ class TrainingManager:
 
     def load_state(self, best=False):
         filename = self.path_to_ckpt
-        filename += "/ckpt_best.pth" if best else "/ckpt_last.pth"
+        # filename += "/ckpt_best.pth" if best else "/ckpt_last.pth"
         rank = 0 if self.rank is None else self.rank
         ckpt = torch.load(
             filename,
             map_location=f"cuda:{rank}",
         )
         self.net.load_state_dict(ckpt["net"])
-        if ckpt.get("optim") is None:
-            warnings.warn("Optimizer state not available")
-        else:
-            self.optim.load_state_dict(ckpt["optim"])
+        # if ckpt.get("optim") is None:
+        #     warnings.warn("Optimizer state not available")
+        # else:
+        #     self.optim.load_state_dict(ckpt["optim"])
         if self.scheduler is not None:
             if ckpt.get("scheduler") is None:
                 warnings.warn("Scheduler state not available")
@@ -288,15 +383,17 @@ class TrainingManager:
         for _ in range(self.current_epoch, self.max_epoch):
             # Train
             self.one_epoch(training=True)
-            # Val
-            miou = self.one_epoch(training=False)
-            # Save best checkpoint
-            if miou is not None and miou > self.best_miou:
-                self.best_miou = miou
-                self.save_state(best=True)
-                print(f"\n\n*** New best mIoU: {self.best_miou:.1f}.\n")
-            # Save last checkpoint
-            self.save_state()
+
+            if self.current_epoch>5:
+                # Val
+                miou = self.one_epoch(training=False)
+                # Save best checkpoint
+                if miou is not None and miou > self.best_miou:
+                    self.best_miou = miou
+                    self.save_state(best=True)
+                    print(f"\n\n*** New best mIoU: {self.best_miou:.1f}.\n")
+                # Save last checkpoint
+                self.save_state()
             # Increase epoch number
             self.current_epoch += 1
         if self.rank == 0 or self.rank is None:

@@ -9,13 +9,15 @@ waffleiron: # Architecture of the backbone
       - 50  # max value on y-axis: 50 m
       - 5   # max value on z-axis: 5 m
   dim_proj:         # Define the sequence of projection (which is then repeated sequentially until \ell = L)
-    - 2  # Project along the z axis at \ell = 1
-    - 1  # Project along the y axis at \ell = 2
-    - 0  # Project along the x axis at \ell = 3
+    - 3  # Project along the z axis at \ell = 1 (and then the same at all layer)
+    - 2  # At \ell = 2, project along y
+    - 1  # At \ell = 1, project along x
+    - 0
   grids_size:       # Define here the size of the 2D grids
     - [166, 166] # At \ell = 1, project along z, ie on (x, y) with FOV [-50, 50] on both axes: size [250, 250] -> resolution 60cm
     - [166,  16] # At \ell = 2, project along y, ie on (x, z) with FOV [-50, 50] on x and [-5, 5] on z: size [250, 25] -> resolution 60cm
     - [166,  16] # At \ell = 3, project along x, ie on (y, z) with FOV [-50, 50] on y and [-5, 5] on z: size [250, 25] -> resolution 60cm
+    - [32, 1024]
   drop: 0.2
 
 classif: # Architecture of the classifcation layer, after WaffleIron
@@ -31,8 +33,8 @@ embedding: # Architecture of the embedding layer, before WaffleIron
   voxel_size: 0.1   # Voxel size for downsampling point cloud in pre-processing
 
 dataloader:
-  batch_size: 4
-  num_workers: 12
+  batch_size: 3
+  num_workers: 5
   max_points: 20000
 
 augmentations:

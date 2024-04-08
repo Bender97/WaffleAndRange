@@ -19,7 +19,7 @@ import numpy as np
 import torch.nn as nn
 from torch import autocast
 
-
+import time
 class myLayerNorm(nn.LayerNorm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -33,6 +33,8 @@ def build_proj_matrix(
 ):
     num_points = indices_non_zeros.shape[1] // batch_size
     matrix_shape = (batch_size, num_2d_cells, num_points)
+
+    cell_ind = inflate_ind.clone()
 
     # Sparse projection matrix for Inflate step
     inflate = torch.sparse_coo_tensor(
@@ -51,7 +53,7 @@ def build_proj_matrix(
     weight_per_point *= occupied_cell.reshape(-1)
     flatten = torch.sparse_coo_tensor(indices_non_zeros, weight_per_point, matrix_shape)
 
-    return {"flatten": flatten, "inflate": inflate_ind}
+    return {"flatten": flatten, "inflate": inflate_ind, "cell_ind":cell_ind, "weight":weight_per_point}
 
 
 class DropPath(nn.Module):
@@ -102,7 +104,9 @@ class ChannelMix(nn.Module):
         )  # Implement LayerScale
         self.drop_path = DropPath(drop_path_prob)
 
+
     def compress(self):
+
         if self.layer_norm:
             warnings.warn("Compression of ChannelMix layer in WaffleIron has not been implemented with layer norm.")
             return
@@ -111,6 +115,8 @@ class ChannelMix(nn.Module):
             self.norm.running_var.data + 1e-05
         )
         norm_bias = self.norm.bias.data - norm_weight * self.norm.running_mean.data
+        
+
         # Careful the order of the two lines below should not be changed
         self.mlp[0].bias.data = (
             self.mlp[0].weight.data[:, :, 0] @ norm_bias + self.mlp[0].bias.data
@@ -124,8 +130,10 @@ class ChannelMix(nn.Module):
         # Flag
         self.compressed = True
 
+
     def forward(self, tokens):
         """tokens <- tokens + LayerScale( MLP( BN(tokens) ) )"""
+
         if self.compressed:
             assert not self.training
             return tokens + self.drop_path(self.mlp(tokens))
@@ -176,9 +184,22 @@ class SpatialMix(nn.Module):
         residual = self.norm(tokens)
         # Flatten
         with autocast("cuda", enabled=False):
-            residual = torch.bmm(
-                sp_mat["flatten"], residual.transpose(1, 2).float()
-            ).transpose(1, 2)
+            #residual = torch.bmm(
+            #    sp_mat["flatten"], residual.transpose(1, 2).float()
+            #).transpose(1, 2)
+
+            residual = residual * sp_mat["weight"].reshape(B, 1, N)
+
+            output_shape = (B, C, self.H*self.W)
+            output_tensor = torch.zeros(output_shape, dtype=residual.dtype, device=residual.device)
+            
+            # Create the indices tensor for scattering
+            indices = sp_mat["cell_ind"].unsqueeze(1).expand(-1, C, -1)
+            
+            # Scatter the points
+            residual = torch.scatter(output_tensor, 2, indices, residual.float(), reduce='add')
+
+
         residual = residual.reshape(B, C, self.H, self.W)
         # FFN
         residual = self.ffn(residual)
@@ -191,14 +212,29 @@ class SpatialMix(nn.Module):
         """tokens <- tokens + LayerScale( Inflate( FFN( Flatten( BN(tokens) ) ) )"""
         if self.compressed:
             return self.forward_compressed(tokens, sp_mat)
-        #
+        
+
         B, C, N = tokens.shape
         residual = self.norm(tokens)
+
         # Flatten
         with autocast("cuda", enabled=False):
-            residual = torch.bmm(
-                sp_mat["flatten"], residual.transpose(1, 2).float()
-            ).transpose(1, 2)
+            # residual = torch.bmm(
+            #     sp_mat["flatten"], residual.transpose(1, 2).float()
+            # ).transpose(1, 2)
+
+            residual = residual * sp_mat["weight"].reshape(B, 1, N)
+
+            output_shape = (B, C, self.H*self.W)
+            output_tensor = torch.zeros(output_shape, dtype=residual.dtype, device=residual.device)
+            
+            # Create the indices tensor for scattering
+            indices = sp_mat["cell_ind"].unsqueeze(1).expand(-1, C, -1)
+            
+            # Scatter the points
+            residual = torch.scatter_add(output_tensor, 2, indices, residual.float())
+
+
         residual = residual.reshape(B, C, self.H, self.W)
         # FFN
         residual = self.ffn(residual)
@@ -215,6 +251,7 @@ class WaffleIron(nn.Module):
         super().__init__()
         self.depth = depth
         self.grids_shape = grids_shape
+        print("WaffleAndRange grids shape", self.grids_shape)
         self.channel_mix = nn.ModuleList(
             [ChannelMix(channels, drop_path_prob, layer_norm) for _ in range(depth)]
         )

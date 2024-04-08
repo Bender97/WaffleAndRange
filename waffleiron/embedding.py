@@ -121,4 +121,4 @@ class Embedding(nn.Module):
         neigh_emb = self.conv2(neigh_emb).max(-1)[0]
 
         # Merge both embeddings
-        return self.final(torch.cat((point_emb, neigh_emb), dim=1))
+        return self.final(torch.cat((point_emb, neigh_emb), dim=1)), neigh_emb
