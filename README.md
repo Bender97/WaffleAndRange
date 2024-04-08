@@ -1,12 +1,13 @@
 # WaffleIron
 
-![](./illustration.png)
+![](./Network.png)
+![](./Block.png)
 
-[**Using a Waffle Iron for Automotive Point Cloud Semantic Segmentation**](http://arxiv.org/abs/2301.10100)  
-[*Gilles Puy*<sup>1</sup>](https://sites.google.com/site/puygilles/home),
-[*Alexandre Boulch*<sup>1</sup>](http://boulch.eu),
-[*Renaud Marlet*<sup>1,2</sup>](http://imagine.enpc.fr/~marletr/)  
-<sup>1</sup>*valeo.ai, France* and <sup>2</sup>*LIGM, Ecole des Ponts, Univ Gustave Eiffel, CNRS, France*.
+[**Exploiting Local Features and Range Images for Small Data Real-Time Point Cloud Semantic Segmentation**](https://theresebeharrie.com/2018/07/09/three-ways-deal-waiting-publishing/)  
+[*Daniel Fusaro*<sup>1</sup>](https://www.dei.unipd.it/en/persona/85ed20c7cab60b5a1ee989237cc70ec2),
+[*Simone Mosco*<sup>1</sup>](https://www.dei.unipd.it/persona/ec7b2218b236d88ae0be5ca08e73ab80),
+[*Alberto Pretto*<sup>1,2</sup>](https://www.dei.unipd.it/en/persona/C36EC9D29C2C5DFB03BFE9E045B32FD9)  
+<sup>1</sup>*Department of Information Engineering, University of Padova, Italy.*
 
 If you find this code or work useful, please cite the following [paper](http://arxiv.org/abs/2301.10100):
 ```
@@ -16,13 +17,15 @@ If you find this code or work useful, please cite the following [paper](http://a
   booktitle={ICCV},
   year={2023}
 }
+
+// our paper is pending for acceptance at IROS 2024
 ```
 
-## Updates
+<!--## Updates
 
 This work was accepted at ICCV23. The code and trained models were updated on September 21, 2023 to reproduce the scores in the published version. 
 
-If you need to access the preliminary trained models you can refer to this [section](#Preliminary-version). Note that those preliminary models are not performing as well as those used in the published version.
+If you need to access the preliminary trained models you can refer to this [section](#Preliminary-version). Note that those preliminary models are not performing as well as those used in the published version.-->
 
 
 ## Installation
@@ -30,12 +33,12 @@ If you need to access the preliminary trained models you can refer to this [sect
 Setup the environment and clone this repo:
 ```
 pip install pyaml==6.0 tqdm=4.63.0 scipy==1.8.0 torch==1.11.0 tensorboard=2.8.0
-git clone https://github.com/valeoai/WaffleIron
-cd WaffleIron
+pip3 install pycuda pycu
+git clone https://github.com/Bender97/WaffleAndRange
 pip install -e ./
 ```
 
-Download the trained models:
+<!--Download the trained models:
 ```
 wget https://github.com/valeoai/WaffleIron/files/10294733/info_datasets.tar.gz
 tar -xvzf info_datasets.tar.gz
@@ -43,7 +46,7 @@ wget https://github.com/valeoai/WaffleIron/releases/download/v0.2.0/waffleiron_n
 tar -xvzf waffleiron_nuscenes.tar.gz
 wget https://github.com/valeoai/WaffleIron/releases/download/v0.2.0/waffleiron_kitti.tar.gz
 tar -xvzf waffleiron_kitti.tar.gz
-```
+```-->
 
 If you want to uninstall this package, type `pip uninstall waffleiron`.
 
