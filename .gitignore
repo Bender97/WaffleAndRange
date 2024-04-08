@@ -8,9 +8,8 @@
 # Data
 *.npy
 *.npz
-*.txt
+# *.txt
 
-./cudastuff/build/**
 ./cudastuff/fcp-and-knn-results.txt
 cudastuff/build/cmake_install.cmake
 cudastuff/build/cukd_sample
@@ -93,3 +92,9 @@ cudastuff/build/CMakeFiles/mylib_user.dir/my_buildktree_user.cu.o.d
 cudastuff/build/CMakeFiles/mylib_user.dir/objects1.rsp
 cudastuff/build/CMakeFiles/mylib_user.dir/progress.make
 ckpt_c_44_titan2.pth
+cudastuff/build/CMakeFiles/cukd_sample.dir/link.txt
+cudastuff/build/CMakeFiles/mylib_train.dir/link.txt
+cudastuff/build/CMakeFiles/mylib_user.dir/link.txt
+cudastuff/build/CMakeCache.txt
+cudastuff/build/CMakeFiles/TargetDirectories.txt
+cudastuff/fcp-and-knn-results.txt
