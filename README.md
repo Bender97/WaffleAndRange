@@ -10,11 +10,11 @@ If you find this code or work useful, please cite the following [paper](https://
 @inproceedings{fusaro2024iros,
   title={Exploiting Local Features and Range Images for Small Data Real-Time Point Cloud Semantic Segmentation},
   author={Fusaro, Daniel and Mosco, Simone and Pretto, Alberto},
-  booktitle={IROS},
+  booktitle={2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
   year={2024}
 }
 
-// our paper has been accepted for publication at IROS 2024
+// our paper has been accepted for publication at IROS 2024 [arXiv](https://arxiv.org/pdf/2410.10510)
 ```
 
 
