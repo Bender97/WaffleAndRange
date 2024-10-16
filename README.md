@@ -5,7 +5,7 @@
 *All authors are within the Department of Information Engineering, University of Padova, Italy.*
 
 
-If you find this code or work useful, please cite the following [paper](https://ras.papercept.net/conferences/conferences/IROS24/program/IROS24_ContentListWeb_3.html#wepi3t5_03):
+If you find this code or work useful, please cite the following [paper]((https://arxiv.org/pdf/2410.10510):
 ```
 @inproceedings{fusaro2024iros,
   title={Exploiting Local Features and Range Images for Small Data Real-Time Point Cloud Semantic Segmentation},
@@ -14,7 +14,7 @@ If you find this code or work useful, please cite the following [paper](https://
   year={2024}
 }
 
-// our paper has been accepted for publication at IROS 2024 [arXiv](https://arxiv.org/pdf/2410.10510)
+// our paper has been accepted for publication at IROS 2024
 ```
 
 
